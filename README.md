@@ -316,7 +316,7 @@ You can find all checkpoints in the GitHub Releases.
 | | | Trainval 103k | 25 | 93.7 |
 | | | Train 103k + Simscale 65k | 30 | 94.0 |
 | | | **Train 103k + Simscale 134k** | **30** | **94.6** |
-| | | *"Human" Driver GT* | *-* | *94.0* |
+| | | *"Human" Driver GT* | *-* | *94.8* |
 | | | | | |
 | **Nav2** | **EPDMS** | Train 85k | 10 | 48.3 |
 | | | Train 85k + Simscale 65k | 30 | 52.2 |
@@ -377,11 +377,11 @@ Due to the compute ressource and time constraints, we did not train on whole sim
 
 # BibTeX
 ```
-@article{kirby2026driving,
-  title={Driving on Registers},
-  author={Kirby, Ellington and Boulch, Alexandre and Xu, Yihong and Yin, Yuan and Puy, Gilles and Zablocki, {\'E}loi and Bursuc, Andrei and Gidaris, Spyros and Marlet, Renaud and Bartoccioni, Florent and others},
-  journal={arXiv preprint arXiv:2601.05083},
-  year={2026}
+@inproceedings{kirby2026drivor,
+  title   = {Driving on Registers},
+  author  = {Kirby, Ellington and Boulch, Alexandre and Xu, Yihong and Yin, Yuan and Puy, Gilles and Zablocki, Éloi and Bursuc, Andrei and Gidaris, Spyros and Marlet, Renaud and Bartoccioni, Florent and Cao, Anh-Quan and Samet, Nermin and Vu, Tuan-Hung and Cord, Matthieu},
+  booktitle = {CVPR},
+  year    = {2026}
 }
 ```
 
