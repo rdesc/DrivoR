@@ -44,7 +44,7 @@ The extraction script mounts the squashfs to `$SLURM_TMPDIR` and creates symlink
 
 ## 4. Metric caching (CPU job, run once)
 
-Pre-computes PDM-Closed planner results needed for the training loss. This is a CPU-only job.
+Pre-computes PDM-Closed planner results needed for the training loss. This is a CPU-only job. Make sure to update `NAVSIM_DEVKIT_ROOT` inside the script!
 
 ```bash
 sbatch metric_caching_nibi.sh
@@ -59,6 +59,8 @@ tail -f navsim-metric-cache-<JOBID>.out
 The cache is written to `exp/train_metric_cache/`. This only needs to be done once.
 
 ## 5. Training (GPU job)
+
+ Make sure to update `NAVSIM_DEVKIT_ROOT` inside the script!
 
 ```bash
 sbatch train_drivor.sh
