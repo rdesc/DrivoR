@@ -1,4 +1,4 @@
-# DrivoR — Cluster Setup (Narval)
+# DrivoR — Cluster Setup (nibi)
 
 ## 1. Clone and install
 
