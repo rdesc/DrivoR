@@ -1,20 +1,20 @@
 #!/bin/bash
 #SBATCH --job-name=drivor-train
-#SBATCH --partition=gpubase_bygpu_b5
 #SBATCH --gres=gpu:h100:4
-#SBATCH --cpus-per-task=16
-#SBATCH --mem=128G
+#SBATCH --cpus-per-task=64
+#SBATCH --mem=256G
 #SBATCH --time=01:00:00
 #SBATCH --output=%x-%j.out
 #SBATCH --error=%x-%j.err
 
 module load cuda/12.2
 
-source /scratch/rdesc/DrivoR/.venv/bin/activate
+export NAVSIM_DEVKIT_ROOT=/home/rdesc/scratch/DrivoR
 
-source /project/6061241/rdesc/extract_navsim.sh /home/rdesc/scratch/DrivoR
+source $NAVSIM_DEVKIT_ROOT/.venv/bin/activate
+source $NAVSIM_DEVKIT_ROOT/extract_navsim_nibi.sh $NAVSIM_DEVKIT_ROOT
 
-export NUPLAN_MAPS_ROOT=/scratch/rdesc/DrivoR/download/maps
+export NUPLAN_MAPS_ROOT=$NAVSIM_DEVKIT_ROOT/download/maps
 export HYDRA_FULL_ERROR=1
 
 EXPERIMENT=training_drivoR_Nav1_traj_long_25epochs

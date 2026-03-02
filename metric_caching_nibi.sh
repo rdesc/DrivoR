@@ -1,17 +1,17 @@
 #!/bin/bash
 #SBATCH --job-name=navsim-metric-cache
-#SBATCH --partition=cpubase_bycore_b3
 #SBATCH --cpus-per-task=64
 #SBATCH --mem=128G
 #SBATCH --time=24:00:00
 #SBATCH --output=%x-%j.out
 #SBATCH --error=%x-%j.err
 
-source /scratch/rdesc/DrivoR/.venv/bin/activate
+export NAVSIM_DEVKIT_ROOT=/home/rdesc/scratch/DrivoR
 
-source /project/6061241/rdesc/extract_navsim.sh /home/rdesc/scratch/DrivoR
+source $NAVSIM_DEVKIT_ROOT/.venv/bin/activate
+source $NAVSIM_DEVKIT_ROOT/extract_navsim_nibi.sh $NAVSIM_DEVKIT_ROOT
 
-export NUPLAN_MAPS_ROOT=/scratch/rdesc/DrivoR/download/maps
+export NUPLAN_MAPS_ROOT=$NAVSIM_DEVKIT_ROOT/download/maps
 export HYDRA_FULL_ERROR=1
 
 TRAIN_TEST_SPLIT=navtrain
