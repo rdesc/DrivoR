@@ -97,6 +97,7 @@ grpo_loss:
   grpo_weight: 1.0
 
 checkpoint_path: ''   # path to pre-trained DrivoR checkpoint (backbone + generator loaded, scorer re-initialised)
+ref_update_interval: 200  # update π_old every N optimizer steps; keep clip_fraction ~10-30% with eps=0.2
 lr_args:
   name: AdamW
   base_lr: 1e-4

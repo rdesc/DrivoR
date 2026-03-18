@@ -3,12 +3,34 @@ import math
 from typing import Dict
 
 import numpy as np
+import pytorch_lightning as pl
 import torch
 import torch.nn as nn
 
 from .drivor_agent import DrivoRAgent
 from .layers.losses.grpo_loss import GRPOLoss
 from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
+
+
+class RefPolicyUpdateCallback(pl.Callback):
+    """
+    Updates π_old (the reference policy used for PPO clipping) every
+    `update_interval` optimizer steps.
+
+    With 1 gradient update per batch, π_old must lag behind the current
+    policy by at least 1 step for the clip ratio to be non-trivial.
+    Updating every ~200 steps keeps the policy drift within a range where
+    eps=0.2 is still a meaningful constraint (clip_fraction ~10-30%).
+    """
+
+    def __init__(self, agent: "DrivoRGRPOOption3Agent", update_interval: int = 200):
+        self.agent = agent
+        self.update_interval = update_interval
+
+    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
+        # global_step counts optimizer steps across all epochs
+        if (trainer.global_step + 1) % self.update_interval == 0:
+            self.agent._update_reference()
 
 
 class DrivoRGRPOOption3Agent(DrivoRAgent):
@@ -21,14 +43,17 @@ class DrivoRGRPOOption3Agent(DrivoRAgent):
 
     The 6 BCE heads are present but frozen and unused during this fine-tuning.
 
-    The reference policy is a frozen clone of (scorer_attention, pos_embed,
-    selection_head) at the start of training.
+    π_old (reference for PPO clipping) is initialised to the random init and
+    refreshed every `ref_update_interval` optimizer steps so that clip ratios
+    stay in a meaningful range throughout training (see RefPolicyUpdateCallback).
     """
 
-    def __init__(self, grpo_loss: nn.Module, checkpoint_path: str = "", **kwargs):
+    def __init__(self, grpo_loss: nn.Module, checkpoint_path: str = "",
+                 ref_update_interval: int = 200, **kwargs):
         # Pass checkpoint_path="" to DrivoRAgent so it sets up training infra
         # (metric cache, loss, Ray worker). Store the real path for initialize().
         self._grpo_checkpoint_path = checkpoint_path
+        self.ref_update_interval = ref_update_interval
         super().__init__(checkpoint_path="", **kwargs)
         self.grpo_loss_fn = grpo_loss
 
@@ -68,7 +93,8 @@ class DrivoRGRPOOption3Agent(DrivoRAgent):
         for param in self._drivor_model.scorer.selection_head.parameters():
             param.requires_grad_(True)
 
-        # frozen reference = clone of the randomly-initialised scorer modules
+        # π_old = clone of the randomly-initialised scorer modules;
+        # refreshed every ref_update_interval steps by RefPolicyUpdateCallback
         self.ref_scorer_attention = copy.deepcopy(self._drivor_model.scorer_attention)
         self.ref_pos_embed = copy.deepcopy(self._drivor_model.pos_embed)
         self.ref_selection_head = copy.deepcopy(self._drivor_model.scorer.selection_head)
@@ -80,8 +106,20 @@ class DrivoRGRPOOption3Agent(DrivoRAgent):
         total = sum(p.numel() for p in self.parameters())
         print(f"[DrivoRGRPOOption3Agent] trainable params: {trainable:,} / {total:,}")
 
+    def _update_reference(self) -> None:
+        """Copy current policy weights into π_old (reference modules)."""
+        for ref_p, p in zip(self.ref_scorer_attention.parameters(),
+                            self._drivor_model.scorer_attention.parameters()):
+            ref_p.data.copy_(p.data)
+        for ref_p, p in zip(self.ref_pos_embed.parameters(),
+                            self._drivor_model.pos_embed.parameters()):
+            ref_p.data.copy_(p.data)
+        for ref_p, p in zip(self.ref_selection_head.parameters(),
+                            self._drivor_model.scorer.selection_head.parameters()):
+            ref_p.data.copy_(p.data)
+
     def _ref_selection_logit(self, proposals: torch.Tensor, scene_features: torch.Tensor, ego_token: torch.Tensor) -> torch.Tensor:
-        """Compute selection logits under the frozen reference policy."""
+        """Compute selection logits under π_old (frozen reference policy)."""
         B, N, _, _ = proposals.shape
         embedded_traj = self.ref_pos_embed(proposals.reshape(B, N, -1))  # (B, N, d_model)
         tr_out_ref = self.ref_scorer_attention(embedded_traj, scene_features)  # (B, N, d_model)
@@ -96,7 +134,7 @@ class DrivoRGRPOOption3Agent(DrivoRAgent):
     ) -> Dict:
         selection_logit = pred["selection_logit"]  # [B, K]
 
-        # reference logits from frozen clone
+        # reference logits from π_old (updated every ref_update_interval steps)
         with torch.no_grad():
             ref_logit = self._ref_selection_logit(
                 pred["proposals"].detach(),
@@ -153,4 +191,5 @@ class DrivoRGRPOOption3Agent(DrivoRAgent):
         )
         checkpoint_cb = ModelCheckpoint(save_last=True)
         lr_monitor = LearningRateMonitor(logging_interval="step")
-        return [checkpoint_cb_best, checkpoint_cb, lr_monitor]
+        ref_update_cb = RefPolicyUpdateCallback(self, update_interval=self.ref_update_interval)
+        return [checkpoint_cb_best, checkpoint_cb, lr_monitor, ref_update_cb]
