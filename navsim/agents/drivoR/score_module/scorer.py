@@ -92,6 +92,23 @@ class Scorer(nn.Module):
                 else:
                     self.pred_area =  MLP(config.tf_d_model, config.tf_d_ffn, 5*2)
 
+        self.use_grpo_head = getattr(config, 'use_grpo_head', False)
+        if self.use_grpo_head:
+            self.grpo_head = nn.Sequential(
+                nn.Linear(config.tf_d_model, config.tf_d_model),
+                nn.ReLU(),
+                nn.Linear(config.tf_d_model, 1),
+            )
+
+        # Option 3: single selection head replacing the 6 BCE heads entirely
+        self.use_selection_head = getattr(config, 'use_selection_head', False)
+        if self.use_selection_head:
+            self.selection_head = nn.Sequential(
+                nn.Linear(config.tf_d_model, config.tf_d_model),
+                nn.ReLU(),
+                nn.Linear(config.tf_d_model, 1),
+            )
+
         self.bev_map=config.bev_map
         self.bev_agent=config.bev_agent
 
@@ -115,11 +132,13 @@ class Scorer(nn.Module):
 
         proposal_feature = bev_feature
         pred_logit = {}
-        
+
         # selected_indices: B,
         for k, head in self.pred_score.items():
             pred_logit[k] = head(proposal_feature).squeeze(-1)
-        
+
+        grpo_logit = self.grpo_head(proposal_feature).squeeze(-1) if self.use_grpo_head else None
+        selection_logit = self.selection_head(proposal_feature).squeeze(-1) if self.use_selection_head else None
         pred_logit2=pred_agents_states=pred_area_logit=bev_semantic_map=agent_states=agent_labels=None
 
         if self.double_score:
@@ -142,4 +161,14 @@ class Scorer(nn.Module):
                 agent_states = agents[:, :, :-1]
                 agent_labels = agents[:, :, -1]
 
-        return pred_logit, pred_logit2, pred_agents_states, pred_area_logit,bev_semantic_map,agent_states,agent_labels
+        return (
+            pred_logit,         # dict[str, [B, K]]     — 6 BCE metric logits (always populated)
+            pred_logit2,        # [B, K, 6] or None     — double-score variant (double_score=True)
+            pred_agents_states, # [B,K,T,N,2,9] or None — agent collision predictions (agent_pred=True, train only)
+            pred_area_logit,    # [B,K,T,...] or None   — drivable area predictions (area_pred=True, train only)
+            bev_semantic_map,   # tensor or None        — BEV semantic map (bev_map=True, train only)
+            agent_states,       # tensor or None        — agent states from bev decoder (bev_agent=True, train only)
+            agent_labels,       # tensor or None        — agent labels from bev decoder (bev_agent=True, train only)
+            grpo_logit,         # [B, K] or None        — Option 2 dedicated GRPO head logits (use_grpo_head=True)
+            selection_logit,    # [B, K] or None        — Option 3 single selection head logits (use_selection_head=True)
+        )

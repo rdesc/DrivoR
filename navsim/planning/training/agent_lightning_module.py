@@ -74,25 +74,40 @@ class AgentLightningModule(pl.LightningModule):
             mean_score=proposal_scores.mean()
 
             logging_prefix="val"
+            # oracle ranking — used as ground truth for all hit-rate metrics below
+            best_real_score_index = torch.argmax(all_proposal_scores, dim=1)
+            best_possible_scores = all_proposal_scores[torch.arange(len(all_proposal_scores)), best_real_score_index]
+            top_5_indices_real = torch.topk(all_proposal_scores, k=5, dim=1).indices
+
+            # original BCE-based selection metrics (not meaningful for Option 3 where BCE heads are frozen/random)
             if "pdm_score" in predictions:
                 pdm_score = predictions["pdm_score"]
                 best_pred_score_values = pdm_score[torch.arange(len(pdm_score)), torch.argmax(pdm_score, dim=1)]
                 score_error = torch.abs(best_pred_score_values - proposal_scores).mean()
                 self.log(f"{logging_prefix}/score_error", score_error, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-                
-                best_pred_score_index = torch.argmax(pdm_score, dim=1)
-                best_real_score_index = torch.argmax(all_proposal_scores, dim=1)
-                score_hit_rate = torch.mean(best_pred_score_index == best_real_score_index, dtype=torch.float32)
 
-                best_possible_scores = all_proposal_scores[torch.arange(len(all_proposal_scores)), best_real_score_index]
+                best_pred_score_index = torch.argmax(pdm_score, dim=1)
+                score_hit_rate = torch.mean(best_pred_score_index == best_real_score_index, dtype=torch.float32)
                 best_actual_scores = all_proposal_scores[torch.arange(len(all_proposal_scores)), best_pred_score_index]
                 lost_score = torch.mean(best_possible_scores - best_actual_scores)
                 self.log(f"{logging_prefix}/score_hit_rate", score_hit_rate, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
                 self.log(f"{logging_prefix}/lost_score", lost_score, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-
-                top_5_indices_real = torch.topk(all_proposal_scores, k=5, dim=1).indices
                 top_5_score_hit_rate = _rowwise_isin(best_pred_score_index, top_5_indices_real).mean(dtype=torch.float32)
                 self.log(f"{logging_prefix}/top_5_score_hit_rate", top_5_score_hit_rate, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+
+            # selection_logit-based ranking metrics (Option 3 / GRPO)
+            if predictions.get("selection_logit") is not None:
+                selection_logit = predictions["selection_logit"]
+                best_sel_index = torch.argmax(selection_logit, dim=1)
+                sel_hit_rate = torch.mean(best_sel_index == best_real_score_index, dtype=torch.float32)
+                sel_best_actual = all_proposal_scores[torch.arange(len(all_proposal_scores)), best_sel_index]
+                sel_lost_score = torch.mean(best_possible_scores - sel_best_actual)
+                sel_top5_hit_rate = _rowwise_isin(best_sel_index, top_5_indices_real).mean(dtype=torch.float32)
+                sel_entropy = -(selection_logit.softmax(dim=-1) * selection_logit.log_softmax(dim=-1)).sum(dim=-1).mean()
+                self.log(f"{logging_prefix}/sel_hit_rate", sel_hit_rate, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+                self.log(f"{logging_prefix}/sel_lost_score", sel_lost_score, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+                self.log(f"{logging_prefix}/sel_top5_hit_rate", sel_top5_hit_rate, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+                self.log(f"{logging_prefix}/sel_entropy", sel_entropy, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
             
             self.log(f"{logging_prefix}/score", final_score, on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
             self.log(f"{logging_prefix}/best_score", best_score, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
