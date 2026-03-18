@@ -29,7 +29,7 @@ mkdir -p $OUTPUT_DIR
 # Resume from last checkpoint if one exists (supports multi-job runs on 3-hour short-unkillable).
 # Lightning saves to {output_dir}/lightning_logs/version_N/checkpoints/last.ckpt where N increments
 # each restart, so we find the most recently modified last.ckpt anywhere under OUTPUT_DIR.
-LAST_CKPT=$(find $OUTPUT_DIR -name "last.ckpt" -type f 2>/dev/null | xargs ls -t 2>/dev/null | head -1)
+LAST_CKPT=$(find $OUTPUT_DIR -name "last.ckpt" -type f 2>/dev/null | xargs -r ls -t 2>/dev/null | head -1)
 RESUME_ARG=""
 if [ -n "$LAST_CKPT" ]; then
     echo "Resuming from $LAST_CKPT"

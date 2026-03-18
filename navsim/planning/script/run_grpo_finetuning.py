@@ -111,7 +111,15 @@ def main(cfg: DictConfig) -> None:
         entity="rdesc1-milaquebec",
         name=cfg.experiment_name,
     )
-    trainer = pl.Trainer(**cfg.trainer.params, callbacks=agent.get_training_callbacks(), logger=wandb_logger)
+    # Pin checkpoint dirpath to output_dir/checkpoints so it doesn't get
+    # redirected to the wandb run directory (WandbLogger overrides trainer.log_dir).
+    from pytorch_lightning.callbacks import ModelCheckpoint
+    checkpoint_dir = os.path.join(cfg.output_dir, "checkpoints")
+    callbacks = agent.get_training_callbacks()
+    for cb in callbacks:
+        if isinstance(cb, ModelCheckpoint):
+            cb.dirpath = checkpoint_dir
+    trainer = pl.Trainer(**cfg.trainer.params, callbacks=callbacks, logger=wandb_logger)
     trainer.fit(
         model=lightning_module,
         train_dataloaders=train_dataloader,

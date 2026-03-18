@@ -189,7 +189,7 @@ class DrivoRGRPOOption3Agent(DrivoRAgent):
         checkpoint_cb_best = ModelCheckpoint(
             save_top_k=1, monitor='val/score_epoch', filename='best-{epoch}-{step}', mode="max"
         )
-        checkpoint_cb = ModelCheckpoint(save_last=True)
+        checkpoint_cb = ModelCheckpoint(save_last=True, every_n_train_steps=600)
         lr_monitor = LearningRateMonitor(logging_interval="step")
         ref_update_cb = RefPolicyUpdateCallback(self, update_interval=self.ref_update_interval)
         return [checkpoint_cb_best, checkpoint_cb, lr_monitor, ref_update_cb]

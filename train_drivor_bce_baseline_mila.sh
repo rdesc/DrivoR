@@ -26,7 +26,7 @@ OUTPUT_DIR=$NAVSIM_EXP_ROOT/ke/drivoR_bce_baseline/run
 mkdir -p $OUTPUT_DIR
 
 # Resume from last checkpoint if one exists
-LAST_CKPT=$(find $OUTPUT_DIR -name "last.ckpt" -type f 2>/dev/null | xargs ls -t 2>/dev/null | head -1)
+LAST_CKPT=$(find $OUTPUT_DIR -name "last.ckpt" -type f 2>/dev/null | xargs -r ls -t 2>/dev/null | head -1)
 RESUME_ARG=""
 if [ -n "$LAST_CKPT" ]; then
     echo "Resuming from $LAST_CKPT"

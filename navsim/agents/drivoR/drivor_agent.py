@@ -57,7 +57,10 @@ class LitProgressBar(ProgressBar):
         for k,v in val_metrics.items():
             print(f"{k},{v:.3f}")
         for k,v in other_metrics.items():
-            print(f"{k},{v:.3f}")
+            try:
+                print(f"{k},{v:.3f}")
+            except (ValueError, TypeError):
+                print(f"{k},{v}")
         print(f"###########\n")
 
 class DrivoRAgent(AbstractAgent):
@@ -285,7 +288,7 @@ class DrivoRAgent(AbstractAgent):
                                         mode="max"
                                         )
         
-        checkpoint_cb = ModelCheckpoint(save_last=True)
+        checkpoint_cb = ModelCheckpoint(save_last=True, every_n_train_steps=600)
 
         lr_monitor = LearningRateMonitor(logging_interval="step", 
                                             log_momentum=False,

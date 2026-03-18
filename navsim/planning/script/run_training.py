@@ -13,6 +13,7 @@ from omegaconf import DictConfig
 from torch.utils.data import DataLoader
 import torch.distributed as dist
 import pytorch_lightning as pl
+from pytorch_lightning.loggers import WandbLogger
 
 from navsim.agents.abstract_agent import AbstractAgent
 from navsim.common.dataclasses import SceneFilter
@@ -151,14 +152,30 @@ def main(cfg: DictConfig) -> None:
         return latest_file
 
 
+    # Pin checkpoint dirpath to output_dir/checkpoints so it doesn't get
+    # redirected to the wandb run directory (WandbLogger overrides trainer.log_dir).
+    from pytorch_lightning.callbacks import ModelCheckpoint
+    checkpoint_dir = os.path.join(cfg.output_dir, "checkpoints")
+    callbacks = agent.get_training_callbacks()
+    for cb in callbacks:
+        if isinstance(cb, ModelCheckpoint):
+            cb.dirpath = checkpoint_dir
+
+    # Resume from last.ckpt in the pinned checkpoint dir if train_ckpt_path not set.
     if cfg.train_ckpt_path is None:
-        # Pattern to match all .ckpt files in the base_path recursively
-        search_pattern = "/".join(str(cfg.output_dir).split("/")[:-1]) + "/*/lightning_logs/version_*/checkpoints/" + '*.ckpt'
-        print("/".join(str(cfg.output_dir).split("/")[:-1]))
-        print("search_pattern ", search_pattern)
-        cfg.train_ckpt_path = find_latest_checkpoint(search_pattern)
-        print("cfg.train_ckpt_path ", cfg.train_ckpt_path)
-    trainer = pl.Trainer(**cfg.trainer.params, callbacks=agent.get_training_callbacks())
+        last_ckpt = os.path.join(checkpoint_dir, "last.ckpt")
+        if os.path.exists(last_ckpt):
+            cfg.train_ckpt_path = last_ckpt
+            logger.info(f"Auto-resuming from {last_ckpt}")
+        else:
+            logger.info("No checkpoint found, starting from scratch")
+
+    wandb_logger = WandbLogger(
+        project="drivoR",
+        entity="rdesc1-milaquebec",
+        name=cfg.experiment_name,
+    )
+    trainer = pl.Trainer(**cfg.trainer.params, callbacks=callbacks, logger=wandb_logger)
 
     if cfg.validation_run:
         logger.info("Starting Validation")
