@@ -115,6 +115,6 @@ class DrivoRGRPOAgent(DrivoRAgent):
         checkpoint_cb_best = ModelCheckpoint(
             save_top_k=1, monitor='val/score_epoch', filename='best-{epoch}-{step}', mode="max"
         )
-        checkpoint_cb = ModelCheckpoint(save_last=True, every_n_train_steps=600)
+        checkpoint_cb = ModelCheckpoint(save_last=True)
         lr_monitor = LearningRateMonitor(logging_interval="step")
         return [checkpoint_cb_best, checkpoint_cb, lr_monitor]
