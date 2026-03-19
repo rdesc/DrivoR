@@ -15,6 +15,9 @@ Supports both GRPO design options:
         train_test_split=navtrain
 """
 import logging
+import os
+
+from pytorch_lightning.callbacks import ModelCheckpoint
 from pathlib import Path
 
 import hydra
@@ -113,7 +116,6 @@ def main(cfg: DictConfig) -> None:
     )
     # Pin checkpoint dirpath to output_dir/checkpoints so it doesn't get
     # redirected to the wandb run directory (WandbLogger overrides trainer.log_dir).
-    from pytorch_lightning.callbacks import ModelCheckpoint
     checkpoint_dir = os.path.join(cfg.output_dir, "checkpoints")
     callbacks = agent.get_training_callbacks()
     for cb in callbacks:
