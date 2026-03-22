@@ -13,24 +13,20 @@ from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
 
 
 class RefPolicyUpdateCallback(pl.Callback):
-    """
-    Updates π_old (the reference policy used for PPO clipping) every
-    `update_interval` optimizer steps.
-
-    With 1 gradient update per batch, π_old must lag behind the current
-    policy by at least 1 step for the clip ratio to be non-trivial.
-    Updating every ~200 steps keeps the policy drift within a range where
-    eps=0.2 is still a meaningful constraint (clip_fraction ~10-30%).
-    """
-
-    def __init__(self, agent: "DrivoRGRPOOption3Agent", update_interval: int = 200):
+    """Updates π_old to current policy weights before each optimizer step (1-step lag)."""
+    def __init__(self, agent):
         self.agent = agent
-        self.update_interval = update_interval
 
-    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
-        # global_step counts optimizer steps across all epochs
-        if (trainer.global_step + 1) % self.update_interval == 0:
-            self.agent._update_reference()
+    def on_before_optimizer_step(self, trainer, pl_module, optimizer):
+        self.agent._update_reference()
+
+
+class GradNormCallback(pl.Callback):
+    def on_before_optimizer_step(self, trainer, pl_module, optimizer):
+        total_norm = torch.nn.utils.clip_grad_norm_(pl_module.parameters(), float('inf'))
+        clip_val = trainer.gradient_clip_val or float('inf')
+        pl_module.log("train/grad_norm", total_norm, on_step=True, on_epoch=False)
+        pl_module.log("train/grad_norm_clipped", min(total_norm, clip_val), on_step=True, on_epoch=False)
 
 
 class DrivoRGRPOOption3Agent(DrivoRAgent):
@@ -43,17 +39,14 @@ class DrivoRGRPOOption3Agent(DrivoRAgent):
 
     The 6 BCE heads are present but frozen and unused during this fine-tuning.
 
-    π_old (reference for PPO clipping) is initialised to the random init and
-    refreshed every `ref_update_interval` optimizer steps so that clip ratios
-    stay in a meaningful range throughout training (see RefPolicyUpdateCallback).
+    The reference policy is a frozen clone of (scorer_attention, pos_embed,
+    selection_head) updated to current weights before each optimizer step (1-step lag).
     """
 
-    def __init__(self, grpo_loss: nn.Module, checkpoint_path: str = "",
-                 ref_update_interval: int = 200, **kwargs):
+    def __init__(self, grpo_loss: nn.Module, checkpoint_path: str = "", **kwargs):
         # Pass checkpoint_path="" to DrivoRAgent so it sets up training infra
         # (metric cache, loss, Ray worker). Store the real path for initialize().
         self._grpo_checkpoint_path = checkpoint_path
-        self.ref_update_interval = ref_update_interval
         super().__init__(checkpoint_path="", **kwargs)
         self.grpo_loss_fn = grpo_loss
 
@@ -93,8 +86,7 @@ class DrivoRGRPOOption3Agent(DrivoRAgent):
         for param in self._drivor_model.scorer.selection_head.parameters():
             param.requires_grad_(True)
 
-        # π_old = clone of the randomly-initialised scorer modules;
-        # refreshed every ref_update_interval steps by RefPolicyUpdateCallback
+        # π_old = clone of scorer modules, updated to current weights before each optimizer step
         self.ref_scorer_attention = copy.deepcopy(self._drivor_model.scorer_attention)
         self.ref_pos_embed = copy.deepcopy(self._drivor_model.pos_embed)
         self.ref_selection_head = copy.deepcopy(self._drivor_model.scorer.selection_head)
@@ -134,7 +126,7 @@ class DrivoRGRPOOption3Agent(DrivoRAgent):
     ) -> Dict:
         selection_logit = pred["selection_logit"]  # [B, K]
 
-        # reference logits from π_old (updated every ref_update_interval steps)
+        # reference logits from π_old (1-step lag)
         with torch.no_grad():
             ref_logit = self._ref_selection_logit(
                 pred["proposals"].detach(),
@@ -160,6 +152,9 @@ class DrivoRGRPOOption3Agent(DrivoRAgent):
             "loss": grpo_loss,
             "score": selection_score,
             "best_score": best_score,
+            "sel_lost_score": best_score - selection_score,
+            "sel_argmax_mean": top_proposals.float().mean(),
+            "sel_argmax_nunique": top_proposals.unique().numel(),
             **grpo_loss_dict,
         }
 
@@ -177,11 +172,7 @@ class DrivoRGRPOOption3Agent(DrivoRAgent):
             global_batchsize = self.batch_size * self.num_gpus
             T_max = int(math.ceil(self.scheduler_args.dataset_size / global_batchsize) * self.scheduler_args.num_epochs)
             T_max_ramp = int(T_max * 0.1)
-            scheduler_ramp = torch.optim.lr_scheduler.LinearLR(optimizer, start_factor=1e-6, total_iters=T_max_ramp)
-            scheduler_cosine = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=T_max - T_max_ramp, eta_min=0.0)
-            scheduler = torch.optim.lr_scheduler.SequentialLR(
-                optimizer, schedulers=[scheduler_ramp, scheduler_cosine], milestones=[T_max_ramp]
-            )
+            scheduler = torch.optim.lr_scheduler.LinearLR(optimizer, start_factor=1e-6, total_iters=T_max_ramp)
             return [optimizer], [{"scheduler": scheduler, "interval": "step"}]
         return [optimizer]
 
@@ -191,5 +182,5 @@ class DrivoRGRPOOption3Agent(DrivoRAgent):
         )
         checkpoint_cb = ModelCheckpoint(save_last=True, every_n_train_steps=600)
         lr_monitor = LearningRateMonitor(logging_interval="step")
-        ref_update_cb = RefPolicyUpdateCallback(self, update_interval=self.ref_update_interval)
-        return [checkpoint_cb_best, checkpoint_cb, lr_monitor, ref_update_cb]
+        ref_update_cb = RefPolicyUpdateCallback(self)
+        return [checkpoint_cb_best, checkpoint_cb, lr_monitor, GradNormCallback(), ref_update_cb]

@@ -6,8 +6,8 @@
 #SBATCH --mem=512G
 #SBATCH --time=03:00:00
 #SBATCH --requeue
-#SBATCH --output=%x-%j.out
-#SBATCH --error=%x-%j.err
+#SBATCH --output=slurm_logs/%x-%j.out
+#SBATCH --error=slurm_logs/%x-%j.err
 
 export NAVSIM_DEVKIT_ROOT=/network/scratch/d/deschaer/DrivoR
 export OPENSCENE_DATA_ROOT=/network/scratch/g/grandhia/navsim_data/drivor_dataset
@@ -39,16 +39,18 @@ fi
 $PYTHON $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_grpo_finetuning.py \
     --config-name default_grpo_option3_training \
     agent.checkpoint_path=$NAVSIM_DEVKIT_ROOT/weights/checkpoints/drivor_Nav2_10epochs.pth \
-    experiment_name=drivoR_grpo_option3 \
+    experiment_name=drivoR_grpo_PPOclip_1step_pi_old_eps_0.2_bs_32 \
     output_dir=$OUTPUT_DIR \
     train_test_split=navtrain \
     use_cache_without_dataset=false \
     cache_path=null \
     trainer.params.max_epochs=10 \
     trainer.params.precision=16-mixed \
-    dataloader.params.batch_size=16 \
+    dataloader.params.batch_size=32 \
     dataloader.params.num_workers=8 \
     dataloader.params.prefetch_factor=2 \
     agent.num_gpus=4 \
     agent.progress_bar=false \
+    agent.grpo_loss.entropy_coeff=0.1 \
+    agent.grpo_loss.eps=0.2 \
     $RESUME_ARG
