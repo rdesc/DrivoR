@@ -74,6 +74,7 @@ class DrivoRAgent(AbstractAgent):
             scheduler_args: dict = None,
             batch_size: int = 64,
             num_gpus: int = 1,
+            checkpoint_every_n_steps: int = None,
     ):
         super().__init__()
         self._config = config
@@ -83,6 +84,7 @@ class DrivoRAgent(AbstractAgent):
         self.scheduler_args = scheduler_args
         self.batch_size = batch_size
         self.num_gpus = num_gpus
+        self.checkpoint_every_n_steps = checkpoint_every_n_steps
 
 
         cache_data=False
@@ -288,7 +290,10 @@ class DrivoRAgent(AbstractAgent):
                                         mode="max"
                                         )
         
-        checkpoint_cb = ModelCheckpoint(save_last=True, every_n_train_steps=600)
+        ckpt_kwargs = dict(save_last=True)
+        if self.checkpoint_every_n_steps is not None:
+            ckpt_kwargs["every_n_train_steps"] = self.checkpoint_every_n_steps
+        checkpoint_cb = ModelCheckpoint(**ckpt_kwargs)
 
         lr_monitor = LearningRateMonitor(logging_interval="step", 
                                             log_momentum=False,

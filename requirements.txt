@@ -52,3 +52,6 @@ timm==1.0.15
 einops
 
 open3d # for B2D processing
+
+wandb
+debugpy==1.8.0

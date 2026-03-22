@@ -106,3 +106,4 @@ batch_size: ${dataloader.params.batch_size}
 num_gpus: 1
 
 progress_bar: true
+checkpoint_every_n_steps: null  # null = save at end of epoch only

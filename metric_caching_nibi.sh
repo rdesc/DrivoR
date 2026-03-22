@@ -3,8 +3,8 @@
 #SBATCH --cpus-per-task=64
 #SBATCH --mem=128G
 #SBATCH --time=24:00:00
-#SBATCH --output=%x-%j.out
-#SBATCH --error=%x-%j.err
+#SBATCH --output=slurm_logs/%x-%j.out
+#SBATCH --error=slurm_logs/%x-%j.err
 
 export NAVSIM_DEVKIT_ROOT=/home/rdesc/scratch/DrivoR
 

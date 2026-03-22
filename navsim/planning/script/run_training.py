@@ -1,3 +1,4 @@
+import hashlib
 import os
 import random
 from typing import Tuple
@@ -152,10 +153,24 @@ def main(cfg: DictConfig) -> None:
         return latest_file
 
 
+    # Deterministic run ID from experiment name — stable across job restarts so all
+    # jobs for the same experiment resume the same WandB run. To start a fresh run,
+    # change experiment_name (e.g. drivoR_scratch_v2).
+    wandb_run_id = hashlib.md5(cfg.experiment_name.encode()).hexdigest()[:8]
+    output_dir = cfg.output_dir
+    os.makedirs(output_dir, exist_ok=True)
+    wandb_logger = WandbLogger(
+        project="drivoR",
+        entity="rdesc1-milaquebec",
+        name=cfg.experiment_name,
+        id=wandb_run_id,
+        resume="allow",
+    )
+
     # Pin checkpoint dirpath to output_dir/checkpoints so it doesn't get
     # redirected to the wandb run directory (WandbLogger overrides trainer.log_dir).
     from pytorch_lightning.callbacks import ModelCheckpoint
-    checkpoint_dir = os.path.join(cfg.output_dir, "checkpoints")
+    checkpoint_dir = os.path.join(output_dir, "checkpoints")
     callbacks = agent.get_training_callbacks()
     for cb in callbacks:
         if isinstance(cb, ModelCheckpoint):
@@ -169,12 +184,6 @@ def main(cfg: DictConfig) -> None:
             logger.info(f"Auto-resuming from {last_ckpt}")
         else:
             logger.info("No checkpoint found, starting from scratch")
-
-    wandb_logger = WandbLogger(
-        project="drivoR",
-        entity="rdesc1-milaquebec",
-        name=cfg.experiment_name,
-    )
     trainer = pl.Trainer(**cfg.trainer.params, callbacks=callbacks, logger=wandb_logger)
 
     if cfg.validation_run:

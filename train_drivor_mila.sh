@@ -21,25 +21,18 @@ PYTHON=/network/scratch/d/deschaer/envs/drivoR/bin/python
 
 mkdir -p $NAVSIM_EXP_ROOT
 
-# Use a fixed output_dir so checkpoints are always written to the same location across job restarts.
-# Each new run with a timestamp would create a fresh directory, breaking resume.
-OUTPUT_DIR=$NAVSIM_EXP_ROOT/ke/drivoR_grpo_option3/run
+# ── Change RUN_NAME to start a fresh run (new dir + new WandB run). ──────────
+RUN_NAME=drivoR_grpo_entropy_0.1_no_clipping
+# ─────────────────────────────────────────────────────────────────────────────
+OUTPUT_DIR=$NAVSIM_EXP_ROOT/$RUN_NAME
 mkdir -p $OUTPUT_DIR
 
-# Resume from last checkpoint if one exists (supports multi-job runs on 3-hour short-unkillable).
-# Lightning saves to {output_dir}/lightning_logs/version_N/checkpoints/last.ckpt where N increments
-# each restart, so we find the most recently modified last.ckpt anywhere under OUTPUT_DIR.
-LAST_CKPT=$(find $OUTPUT_DIR -name "last.ckpt" -type f 2>/dev/null | xargs -r ls -t 2>/dev/null | head -1)
-RESUME_ARG=""
-if [ -n "$LAST_CKPT" ]; then
-    echo "Resuming from $LAST_CKPT"
-    RESUME_ARG="train_ckpt_path=$LAST_CKPT"
-fi
+# Auto-resume is handled by run_grpo_finetuning.py (looks for last.ckpt in checkpoint_dir).
 
 $PYTHON $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_grpo_finetuning.py \
     --config-name default_grpo_option3_training \
     agent.checkpoint_path=$NAVSIM_DEVKIT_ROOT/weights/checkpoints/drivor_Nav2_10epochs.pth \
-    experiment_name=drivoR_grpo_PPOclip_1step_pi_old_eps_0.2_bs_32 \
+    experiment_name=$RUN_NAME \
     output_dir=$OUTPUT_DIR \
     train_test_split=navtrain \
     use_cache_without_dataset=false \
@@ -51,6 +44,6 @@ $PYTHON $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_grpo_finetuning.py \
     dataloader.params.prefetch_factor=2 \
     agent.num_gpus=4 \
     agent.progress_bar=false \
+    trainer.params.log_every_n_steps=1 \
     agent.grpo_loss.entropy_coeff=0.1 \
-    agent.grpo_loss.eps=0.2 \
-    $RESUME_ARG
+    agent.grpo_loss.eps=0.2

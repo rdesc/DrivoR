@@ -14,6 +14,7 @@ Supports both GRPO design options:
         agent.checkpoint_path=/path/to/drivoR_checkpoint.ckpt \
         train_test_split=navtrain
 """
+import hashlib
 import logging
 import os
 
@@ -109,24 +110,43 @@ def main(cfg: DictConfig) -> None:
     val_dataloader = DataLoader(val_data, **cfg.dataloader.params, shuffle=False, drop_last=True)
     logger.info("Train samples: %d  |  Val samples: %d", len(train_data), len(val_data))
 
+    # Deterministic run ID from experiment name — stable across job restarts so all
+    # jobs for the same experiment resume the same WandB run. To start a fresh run,
+    # change experiment_name (e.g. drivoR_grpo_option3_v2).
+    wandb_run_id = hashlib.md5(cfg.experiment_name.encode()).hexdigest()[:8]
+    output_dir = cfg.output_dir
+    os.makedirs(output_dir, exist_ok=True)
     wandb_logger = WandbLogger(
         project="drivoR",
         entity="rdesc1-milaquebec",
         name=cfg.experiment_name,
+        id=wandb_run_id,
+        resume="allow",
     )
     # Pin checkpoint dirpath to output_dir/checkpoints so it doesn't get
     # redirected to the wandb run directory (WandbLogger overrides trainer.log_dir).
-    checkpoint_dir = os.path.join(cfg.output_dir, "checkpoints")
+    checkpoint_dir = os.path.join(output_dir, "checkpoints")
     callbacks = agent.get_training_callbacks()
     for cb in callbacks:
         if isinstance(cb, ModelCheckpoint):
             cb.dirpath = checkpoint_dir
+
+    # Auto-resume from last.ckpt if train_ckpt_path not explicitly provided.
+    train_ckpt_path = cfg.get("train_ckpt_path", None)
+    if train_ckpt_path is None:
+        last_ckpt = os.path.join(checkpoint_dir, "last.ckpt")
+        if os.path.exists(last_ckpt):
+            train_ckpt_path = last_ckpt
+            logger.info(f"Auto-resuming from {last_ckpt}")
+        else:
+            logger.info("No checkpoint found, starting from scratch")
+
     trainer = pl.Trainer(**cfg.trainer.params, callbacks=callbacks, logger=wandb_logger)
     trainer.fit(
         model=lightning_module,
         train_dataloaders=train_dataloader,
         val_dataloaders=val_dataloader,
-        ckpt_path=cfg.get("train_ckpt_path", None),
+        ckpt_path=train_ckpt_path,
     )
 
 

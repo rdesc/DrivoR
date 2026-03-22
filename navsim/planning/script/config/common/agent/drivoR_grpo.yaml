@@ -95,6 +95,7 @@ grpo_loss:
   eps: 0.2
   beta: 0.01
   grpo_weight: 1.0
+  entropy_coeff: 0.0
 
 checkpoint_path: ''   # path to pre-trained DrivoR checkpoint to fine-tune from
 lr_args:
@@ -109,3 +110,4 @@ batch_size: ${dataloader.params.batch_size}
 num_gpus: 1
 
 progress_bar: true
+checkpoint_every_n_steps: null  # null = save at end of epoch only

@@ -125,3 +125,4 @@ batch_size: ${dataloader.params.batch_size}
 num_gpus: 1 # the batchsize is per gpu --> need to update for steps
 
 progress_bar: true # default progress bar. if false replace by a console print every 100 iterations (better for JZ)
+checkpoint_every_n_steps: null  # null = save at end of epoch only

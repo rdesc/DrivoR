@@ -180,7 +180,10 @@ class DrivoRGRPOOption3Agent(DrivoRAgent):
         checkpoint_cb_best = ModelCheckpoint(
             save_top_k=1, monitor='val/score_epoch', filename='best-{epoch}-{step}', mode="max"
         )
-        checkpoint_cb = ModelCheckpoint(save_last=True, every_n_train_steps=600)
+        ckpt_kwargs = dict(save_last=True)
+        if self.checkpoint_every_n_steps is not None:
+            ckpt_kwargs["every_n_train_steps"] = self.checkpoint_every_n_steps
+        checkpoint_cb = ModelCheckpoint(**ckpt_kwargs)
         lr_monitor = LearningRateMonitor(logging_interval="step")
         ref_update_cb = RefPolicyUpdateCallback(self)
         return [checkpoint_cb_best, checkpoint_cb, lr_monitor, GradNormCallback(), ref_update_cb]

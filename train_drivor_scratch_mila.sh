@@ -6,8 +6,8 @@
 #SBATCH --mem=512G
 #SBATCH --time=03:00:00
 #SBATCH --requeue
-#SBATCH --output=%x-%j.out
-#SBATCH --error=%x-%j.err
+#SBATCH --output=slurm_logs/%x-%j.out
+#SBATCH --error=slurm_logs/%x-%j.err
 
 export NAVSIM_DEVKIT_ROOT=/network/scratch/d/deschaer/DrivoR
 export OPENSCENE_DATA_ROOT=/network/scratch/g/grandhia/navsim_data/drivor_dataset
@@ -21,15 +21,16 @@ PYTHON=/network/scratch/d/deschaer/envs/drivoR/bin/python
 
 mkdir -p $NAVSIM_EXP_ROOT
 
-# Fixed output_dir so checkpoints accumulate in the same location across job restarts
-OUTPUT_DIR=$NAVSIM_EXP_ROOT/ke/drivoR_scratch/run
+# ── Change RUN_NAME to start a fresh run (new dir + new WandB run). ──────────
+RUN_NAME=drivoR_scratch
+# ─────────────────────────────────────────────────────────────────────────────
+OUTPUT_DIR=$NAVSIM_EXP_ROOT/$RUN_NAME
 mkdir -p $OUTPUT_DIR
 
-# run_training.py has built-in auto-resume: searches for the latest ckpt under
-# the parent of output_dir if train_ckpt_path is null (the default).
+# Auto-resume is handled by run_training.py (looks for last.ckpt in checkpoint_dir).
 
 $PYTHON $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_training.py \
-    experiment_name=drivoR_scratch \
+    experiment_name=$RUN_NAME \
     output_dir=$OUTPUT_DIR \
     train_test_split=navtrain \
     use_cache_without_dataset=false \

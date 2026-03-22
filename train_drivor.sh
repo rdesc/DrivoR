@@ -4,8 +4,8 @@
 #SBATCH --cpus-per-task=64
 #SBATCH --mem=256G
 #SBATCH --time=01:00:00
-#SBATCH --output=%x-%j.out
-#SBATCH --error=%x-%j.err
+#SBATCH --output=slurm_logs/%x-%j.out
+#SBATCH --error=slurm_logs/%x-%j.err
 
 module load cuda/12.2
 

@@ -13,3 +13,6 @@ __pycache__/
 /carla/
 *egg*
 .DS_Store
+wandb/
+*.out
+*.err
