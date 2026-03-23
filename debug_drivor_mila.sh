@@ -1,13 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=drivor-train
-#SBATCH --partition=short-unkillable
-#SBATCH --gres=gpu:a100l:4
-#SBATCH -c 64
-#SBATCH --mem=512G
-#SBATCH --time=03:00:00
-#SBATCH --requeue
-#SBATCH --output=slurm_logs/%x-%j.out
-#SBATCH --error=slurm_logs/%x-%j.err
+# Debug script — run interactively on a GPU node (not via sbatch).
+# Usage: salloc --gres=gpu:a100l:1 -c 16 --mem=128G --time=01:00:00 --partition=short-unkillable
+#        bash debug_drivor_mila.sh
 
 export NAVSIM_DEVKIT_ROOT=/network/scratch/d/deschaer/DrivoR
 export OPENSCENE_DATA_ROOT=/network/scratch/g/grandhia/navsim_data/drivor_dataset
@@ -15,19 +9,15 @@ export NUPLAN_MAPS_ROOT=/network/scratch/g/grandhia/navsim_data/drivor_dataset/m
 export NUPLAN_MAP_VERSION="nuplan-maps-v1.0"
 export NAVSIM_EXP_ROOT=$NAVSIM_DEVKIT_ROOT/exp
 export HYDRA_FULL_ERROR=1
-export WANDB_API_KEY=$(cat ~/.wandb_api_key 2>/dev/null || echo "")
+export WANDB_MODE=disabled  # no wandb in debug
 
 PYTHON=/network/scratch/d/deschaer/envs/drivoR/bin/python
 
 mkdir -p $NAVSIM_EXP_ROOT
 
-# ── Change RUN_NAME to start a fresh run (new dir + new WandB run). ──────────
-RUN_NAME=drivoR_cgrpo_scadv_nc_dac_ep
-# ─────────────────────────────────────────────────────────────────────────────
+RUN_NAME=debug
 OUTPUT_DIR=$NAVSIM_EXP_ROOT/$RUN_NAME
 mkdir -p $OUTPUT_DIR
-
-# Auto-resume is handled by run_grpo_finetuning.py (looks for last.ckpt in checkpoint_dir).
 
 $PYTHON $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_grpo_finetuning.py \
     --config-name default_grpo_option3_training \
@@ -37,14 +27,16 @@ $PYTHON $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_grpo_finetuning.py \
     train_test_split=navtrain \
     use_cache_without_dataset=false \
     cache_path=null \
-    trainer.params.max_epochs=10 \
-    trainer.params.precision=16-mixed \
-    dataloader.params.batch_size=32 \
-    dataloader.params.num_workers=8 \
+    trainer.params.max_epochs=1 \
+    trainer.params.precision=32 \
+    trainer.params.devices=1 \
+    trainer.params.strategy=auto \
+    dataloader.params.batch_size=4 \
+    dataloader.params.num_workers=2 \
     dataloader.params.prefetch_factor=2 \
-    agent.num_gpus=4 \
-    agent.progress_bar=false \
-    trainer.params.log_every_n_steps=50 \
+    agent.num_gpus=1 \
+    agent.progress_bar=true \
+    trainer.params.log_every_n_steps=1 \
     agent.grpo_loss.eps=0.2 \
     agent.grpo_loss.entropy_coeff=0.1 \
     agent.grpo_loss.use_constraints=true \
@@ -52,8 +44,4 @@ $PYTHON $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_grpo_finetuning.py \
     'agent.grpo_loss.constraint_names=[no_at_fault_collisions,drivable_area_compliance,ego_progress]' \
     'agent.grpo_loss.constraint_thresholds=[0.01,0.01,0.30]' \
     agent.grpo_loss.multiplier_lr=0.03 \
-    trainer.params.strategy=ddp_find_unused_parameters_true \
     resume_wandb=false
-    # ── previous runs (commented out) ──
-    # RUN_NAME=drivoR_constrained_grpo_smoke_test (multiplier update only, no scalarized advantages)
-    # RUN_NAME=drivoR_grpo_entropy_0.1_no_clipping

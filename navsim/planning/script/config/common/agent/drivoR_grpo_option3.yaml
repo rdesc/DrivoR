@@ -97,6 +97,16 @@ grpo_loss:
   grpo_weight: 1.0
   entropy_coeff: 0.0
   group_size: 8
+  # constrained GRPO (scalarized advantages with Lagrangian multipliers)
+  use_constraints: false
+  advantage_method: scalarize_advantages  # or scalarize_rewards
+  constraint_names:
+    - no_at_fault_collisions
+    - drivable_area_compliance
+    - driving_direction_compliance
+  constraint_thresholds: [0.01, 0.01, 0.01]  # max violation rates
+  multiplier_lr: 0.03
+  multiplier_init: 0.02
 
 checkpoint_path: ''   # path to pre-trained DrivoR checkpoint (backbone + generator loaded, scorer re-initialised)
 lr_args:

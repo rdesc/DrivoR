@@ -140,7 +140,7 @@ class DrivoRGRPOOption3Agent(DrivoRAgent):
         )
         oracle_rewards = final_scores  # [B, K]
 
-        grpo_loss, grpo_loss_dict = self.grpo_loss_fn(selection_logit, ref_logit, oracle_rewards)
+        grpo_loss, grpo_loss_dict = self.grpo_loss_fn(selection_logit, ref_logit, oracle_rewards, target_scores=target_scores)
 
         # monitor selection quality
         with torch.no_grad():

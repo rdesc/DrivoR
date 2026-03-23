@@ -106,6 +106,7 @@ class Scorer(nn.Module):
             self.selection_head = nn.Sequential(
                 nn.Linear(config.tf_d_model, config.tf_d_model),
                 nn.ReLU(),
+                nn.LayerNorm(config.tf_d_model),
                 nn.Linear(config.tf_d_model, 1),
             )
 

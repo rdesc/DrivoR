@@ -111,17 +111,18 @@ def main(cfg: DictConfig) -> None:
     logger.info("Train samples: %d  |  Val samples: %d", len(train_data), len(val_data))
 
     # Deterministic run ID from experiment name — stable across job restarts so all
-    # jobs for the same experiment resume the same WandB run. To start a fresh run,
-    # change experiment_name (e.g. drivoR_grpo_option3_v2).
+    # jobs for the same experiment resume the same WandB run.
+    # Set resume_wandb=false to force a fresh WandB run (e.g. after a corrupted init).
     wandb_run_id = hashlib.md5(cfg.experiment_name.encode()).hexdigest()[:8]
+    resume_wandb = cfg.get("resume_wandb", True)
     output_dir = cfg.output_dir
     os.makedirs(output_dir, exist_ok=True)
     wandb_logger = WandbLogger(
         project="drivoR",
         entity="rdesc1-milaquebec",
         name=cfg.experiment_name,
-        id=wandb_run_id,
-        resume="allow",
+        id=wandb_run_id if resume_wandb else None,
+        resume="allow" if resume_wandb else None,
     )
     # Pin checkpoint dirpath to output_dir/checkpoints so it doesn't get
     # redirected to the wandb run directory (WandbLogger overrides trainer.log_dir).
