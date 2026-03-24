@@ -12,9 +12,10 @@ SCORE_COMPONENT_INDICES = {
     "time_to_collision": 3,
     "ego_comfort": 4,
     "driving_direction_compliance": 5,
-    # index 6 = final_scores (aggregate)
+    # index 6 = final_scores (aggregate), both the multiplicative and weighted average
 }
 
+# debug with `import pdb; pdb.set_trace()`
 
 class GRPOLoss(nn.Module):
     """

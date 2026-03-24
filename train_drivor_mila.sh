@@ -22,7 +22,7 @@ PYTHON=/network/scratch/d/deschaer/envs/drivoR/bin/python
 mkdir -p $NAVSIM_EXP_ROOT
 
 # ── Change RUN_NAME to start a fresh run (new dir + new WandB run). ──────────
-RUN_NAME=drivoR_cgrpo_scadv_nc_0.01_dac_0.01_ep_0.20_multiplier_lr_0.005_regular_lr_1e-5_temp_3.0
+RUN_NAME=drivoR_cgrpo_screw_nc_0.01_dac_0.01_ep_0.15_multiplier_lr_0.005_regular_lr_1e-4_temp_1.5
 # ─────────────────────────────────────────────────────────────────────────────
 OUTPUT_DIR=$NAVSIM_EXP_ROOT/$RUN_NAME
 mkdir -p $OUTPUT_DIR
@@ -48,14 +48,14 @@ $PYTHON $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_grpo_finetuning.py \
     agent.grpo_loss.eps=0.2 \
     agent.grpo_loss.entropy_coeff=0.1 \
     agent.grpo_loss.use_constraints=true \
-    agent.grpo_loss.advantage_method=scalarize_advantages \
+    agent.grpo_loss.advantage_method=scalarize_rewards \
     'agent.grpo_loss.constraint_names=[no_at_fault_collisions,drivable_area_compliance,ego_progress]' \
-    'agent.grpo_loss.constraint_thresholds=[0.01,0.01,0.20]' \
+    'agent.grpo_loss.constraint_thresholds=[0.01,0.01,0.15]' \
     agent.grpo_loss.multiplier_lr=0.005 \
-    agent.lr_args.base_lr=1e-5 \
-    agent.grpo_loss.multiplier_temperature=3.0 \
-    trainer.params.strategy=ddp_find_unused_parameters_true
+    trainer.params.strategy=ddp_find_unused_parameters_true \
+    agent.grpo_loss.multiplier_temperature=1.5
     # ── previous runs (commented out) ──
     # RUN_NAME=drivoR_constrained_grpo_smoke_test (multiplier update only, no scalarized advantages)
     # RUN_NAME=drivoR_grpo_entropy_0.1_no_clipping
+    # agent.grpo_loss.multiplier_temperature=1.5 \
 
