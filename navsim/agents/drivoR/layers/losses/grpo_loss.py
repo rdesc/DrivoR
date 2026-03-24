@@ -13,6 +13,7 @@ SCORE_COMPONENT_INDICES = {
     "ego_comfort": 4,
     "driving_direction_compliance": 5,
     # index 6 = final_scores (aggregate), both the multiplicative and weighted average
+    # TODO: change the final score to just be the weighted average (i.e., without the multiplicative component)
 }
 
 # debug with `import pdb; pdb.set_trace()`
