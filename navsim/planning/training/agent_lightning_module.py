@@ -128,6 +128,20 @@ class AgentLightningModule(pl.LightningModule):
         else:
             return self._step(batch, "val")
 
+    def on_save_checkpoint(self, checkpoint):
+        """Save multiplier Adam state if constrained GRPO is active."""
+        grpo_loss = getattr(self.agent, 'grpo_loss_fn', None)
+        if grpo_loss is not None and getattr(grpo_loss, '_multiplier_optim', None) is not None:
+            checkpoint['multiplier_optim_state'] = grpo_loss._multiplier_optim.state_dict()
+
+    def on_load_checkpoint(self, checkpoint):
+        """Stash multiplier Adam state for deferred restore (device not yet known)."""
+        optim_state = checkpoint.pop('multiplier_optim_state', None)
+        if optim_state is not None:
+            grpo_loss = getattr(self.agent, 'grpo_loss_fn', None)
+            if grpo_loss is not None:
+                grpo_loss._pending_optim_state = optim_state
+
     def configure_optimizers(self):
         """Inherited, see superclass."""
         return self.agent.get_optimizers()

@@ -107,6 +107,9 @@ grpo_loss:
   constraint_thresholds: [0.01, 0.01, 0.01]  # max violation rates
   multiplier_lr: 0.03
   multiplier_init: 0.02
+  multiplier_temperature: 1.0  # >1 flattens softmax, reduces winner-take-all
+  multiplier_optim_beta1: 0.9  # Adam momentum for multiplier update
+  multiplier_optim_beta2: 0.999
 
 checkpoint_path: ''   # path to pre-trained DrivoR checkpoint (backbone + generator loaded, scorer re-initialised)
 lr_args:

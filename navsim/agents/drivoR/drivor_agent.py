@@ -107,7 +107,8 @@ class DrivoRAgent(AbstractAgent):
 
             from .score_module.compute_navsim_score import get_scores
 
-            metric_cache = MetricCacheLoader(Path(os.getenv("NAVSIM_EXP_ROOT") + "/train_metric_cache"))
+            # TODO: revert to os.getenv("NAVSIM_EXP_ROOT") + "/train_metric_cache"
+            metric_cache = MetricCacheLoader(Path("/network/scratch/l/luke.rowe/experiments/train_metric_cache"))
             try:
                 # add synthetic metric_cache
                 metric_cache_synthetic_0 = MetricCacheLoader(Path(os.getenv("NAVSIM_EXP_ROOT") + "/train_metric_synthetic_reaction_pdm_v1.0-0"))

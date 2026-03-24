@@ -21,6 +21,7 @@ force_cache_computation: false
 experiment_name: drivoR_grpo_option3
 seed: 0
 train_ckpt_path: null
+resume_wandb: false
 
 dataloader:
   params:

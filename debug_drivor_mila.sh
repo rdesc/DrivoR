@@ -44,4 +44,4 @@ $PYTHON $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_grpo_finetuning.py \
     'agent.grpo_loss.constraint_names=[no_at_fault_collisions,drivable_area_compliance,ego_progress]' \
     'agent.grpo_loss.constraint_thresholds=[0.01,0.01,0.30]' \
     agent.grpo_loss.multiplier_lr=0.03 \
-    resume_wandb=false
+    resume_wandb=true

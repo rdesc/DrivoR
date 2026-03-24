@@ -45,7 +45,10 @@ class GRPOLoss(nn.Module):
                  constraint_names: list = None,
                  constraint_thresholds: list = None,
                  multiplier_lr: float = 0.03,
-                 multiplier_init: float = 0.02):
+                 multiplier_init: float = 0.02,
+                 multiplier_temperature: float = 1.0,
+                 multiplier_optim_beta1: float = 0.9,
+                 multiplier_optim_beta2: float = 0.999):
         super().__init__()
         self.eps = eps
         self.beta = beta
@@ -75,6 +78,8 @@ class GRPOLoss(nn.Module):
             )
             self.register_buffer('_constraint_thresholds', torch.tensor(constraint_thresholds))
             self.multiplier_lr = multiplier_lr
+            self.multiplier_temperature = multiplier_temperature
+            self.multiplier_optim_betas = (multiplier_optim_beta1, multiplier_optim_beta2)
             self.multiplier_signs = -1.0
             self._multiplier_optim = None  # lazy init after device placement
 
@@ -87,8 +92,20 @@ class GRPOLoss(nn.Module):
         """Lazy init — ensures Adam is created after PL moves the module to GPU."""
         if self._multiplier_optim is None:
             self._multiplier_optim = torch.optim.Adam(
-                [self.multiplier_logits], lr=self.multiplier_lr, eps=1e-5
+                [self.multiplier_logits], lr=self.multiplier_lr,
+                betas=self.multiplier_optim_betas, eps=1e-5
             )
+            # restore checkpoint state if available (deferred from on_load_checkpoint)
+            pending = getattr(self, '_pending_optim_state', None)
+            if pending is not None:
+                self._multiplier_optim.load_state_dict(pending)
+                # move optimizer state tensors to the parameter's device
+                device = self.multiplier_logits.device
+                for state in self._multiplier_optim.state.values():
+                    for k, v in state.items():
+                        if isinstance(v, torch.Tensor):
+                            state[k] = v.to(device)
+                del self._pending_optim_state
         return self._multiplier_optim
 
     def _update_multipliers(self, probs: torch.Tensor, target_scores: torch.Tensor):
@@ -107,8 +124,12 @@ class GRPOLoss(nn.Module):
             for idx in self.constraint_indices
         ]).detach()  # [num_constraints]
 
+        # sync violation rates across DDP workers so all replicas update identically
+        if torch.distributed.is_initialized():
+            torch.distributed.all_reduce(violation_rates, op=torch.distributed.ReduceOp.AVG)
+
         # multiplier loss (autograd through softmax)
-        multipliers = F.softmax(self.multiplier_logits, dim=0)[1:]  # [num_constraints]
+        multipliers = F.softmax(self.multiplier_logits / self.multiplier_temperature, dim=0)[1:]  # [num_constraints]
         multiplier_loss = self.multiplier_signs * (multipliers * (violation_rates - self._constraint_thresholds)).sum()
 
         optim = self._get_multiplier_optim()
@@ -116,7 +137,7 @@ class GRPOLoss(nn.Module):
         multiplier_loss.backward()
         optim.step()
 
-        return violation_rates, F.softmax(self.multiplier_logits.detach(), dim=0)
+        return violation_rates, F.softmax(self.multiplier_logits.detach() / self.multiplier_temperature, dim=0)
 
     def forward(
         self,
@@ -133,7 +154,7 @@ class GRPOLoss(nn.Module):
 
         # ---- advantage computation ----
         if self.use_constraints and target_scores is not None:
-            lambdas = F.softmax(self.multiplier_logits.detach(), dim=0)
+            lambdas = F.softmax(self.multiplier_logits.detach() / self.multiplier_temperature, dim=0)
             lambda_R = lambdas[0]
             lambda_C = lambdas[1:]  # [num_constraints]
 
