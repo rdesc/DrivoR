@@ -14,7 +14,6 @@ Supports both GRPO design options:
         agent.checkpoint_path=/path/to/drivoR_checkpoint.ckpt \
         train_test_split=navtrain
 """
-import hashlib
 import logging
 import os
 
@@ -110,19 +109,17 @@ def main(cfg: DictConfig) -> None:
     val_dataloader = DataLoader(val_data, **cfg.dataloader.params, shuffle=False, drop_last=True)
     logger.info("Train samples: %d  |  Val samples: %d", len(train_data), len(val_data))
 
-    # Deterministic run ID from experiment name — stable across job restarts so all
-    # jobs for the same experiment resume the same WandB run.
-    # Set resume_wandb=false to force a fresh WandB run (e.g. after a corrupted init).
-    wandb_run_id = hashlib.md5(cfg.experiment_name.encode()).hexdigest()[:8]
-    resume_wandb = cfg.get("resume_wandb", True)
+    import wandb
+    wandb.login()  # force auth before WandbLogger init (prevents silent failures)
+
     output_dir = cfg.output_dir
     os.makedirs(output_dir, exist_ok=True)
     wandb_logger = WandbLogger(
         project="drivoR",
         entity="rdesc1-milaquebec",
         name=cfg.experiment_name,
-        id=wandb_run_id if resume_wandb else None,
-        resume="allow" if resume_wandb else None,
+        # id=wandb_run_id if resume_wandb else None,
+        # resume="allow" if resume_wandb else None,
     )
     # Pin checkpoint dirpath to output_dir/checkpoints so it doesn't get
     # redirected to the wandb run directory (WandbLogger overrides trainer.log_dir).

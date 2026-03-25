@@ -15,14 +15,15 @@ export NUPLAN_MAPS_ROOT=/network/scratch/g/grandhia/navsim_data/drivor_dataset/m
 export NUPLAN_MAP_VERSION="nuplan-maps-v1.0"
 export NAVSIM_EXP_ROOT=$NAVSIM_DEVKIT_ROOT/exp
 export HYDRA_FULL_ERROR=1
-export WANDB_API_KEY=$(cat ~/.wandb_api_key 2>/dev/null || echo "")
+export WANDB_INIT_TIMEOUT=120
+export WANDB_MODE=online
 
 PYTHON=/network/scratch/d/deschaer/envs/drivoR/bin/python
 
 mkdir -p $NAVSIM_EXP_ROOT
 
 # ── Change RUN_NAME to start a fresh run (new dir + new WandB run). ──────────
-RUN_NAME=drivoR_cgrpo_screw_nc_0.01_dac_0.01_ep_0.15_multiplier_lr_0.005_regular_lr_1e-4_temp_1.5
+RUN_NAME=drivoR_cgrpo_screw_nc_0.01_dac_0.01_ep_0.15_multiplier_lr_0.005_base_lr_1e-4_temp_1.5
 # ─────────────────────────────────────────────────────────────────────────────
 OUTPUT_DIR=$NAVSIM_EXP_ROOT/$RUN_NAME
 mkdir -p $OUTPUT_DIR
@@ -58,4 +59,3 @@ $PYTHON $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_grpo_finetuning.py \
     # RUN_NAME=drivoR_constrained_grpo_smoke_test (multiplier update only, no scalarized advantages)
     # RUN_NAME=drivoR_grpo_entropy_0.1_no_clipping
     # agent.grpo_loss.multiplier_temperature=1.5 \
-
